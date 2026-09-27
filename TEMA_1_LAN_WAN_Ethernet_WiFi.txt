@@ -1,0 +1,54 @@
+                                         SEGUNDA CLASE
+       TEMA 1: LAN, WAN, ETHERNET Y WI-FI
+       (Practica hecha en Kali, fecha: 2026-09-19)
+
+==================================================================================================
+   •   LAN (Local Area Network): red local de alcance corto (casa, oficina, aula). Los
+       dispositivos comparten el mismo segmento (ej. 192.168.1.0/24) y se hablan sin salir a
+       internet.
+
+   •   WAN (Wide Area Network): red que conecta LANs separadas geograficamente. Internet es
+       la WAN mas grande que existe (red de redes: ISPs, cables submarinos, backbones).
+
+   •   Ethernet: red cableada (RJ45). Interfaz en Linux: eth0 / enp0s3.
+   •   Wi-Fi: red inalambrica (802.11, "WLAN"). Interfaz en Linux: wlan0 / wlp2s0.
+
+   •   Gateway (router): la "puerta" de la LAN. Todo lo que sale a la WAN pasa por el.
+
+       Analogia del edificio:
+           LAN     = el interior del edificio (cuartos que se hablan sin salir)
+           Gateway = la puerta principal
+           WAN     = la ciudad fuera del edificio
+
+       LAN vs WAN:
+           Alcance:    LAN local            | WAN global / entre ciudades y paises
+           Velocidad:  LAN muy alta         | WAN variable, mas latencia
+           Propiedad:  LAN tuya (tu router) | WAN de terceros (ISPs)
+           IP ejemplo: 192.168.1.11 privada | 8.8.8.8 publica
+
+   •   Por que importa para Nmap: escanear 192.168.1.0/24 es escanear tu LAN. Escanear una IP
+       publica cruza el gateway, el ISP, NAT y firewalls intermedios (cambia lo que se ve).
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   ip -br addr      → interfaces e IPs en formato resumido
+       lo      UNKNOWN  127.0.0.1/8
+       eth0    DOWN                          (Ethernet sin cable)
+       wlan0   UP       192.168.1.11/24      (conectado por Wi-Fi)
+       - fe80::... es IPv6 link-local: se autoasigna, solo sirve dentro del mismo segmento.
+
+   ip route         → muestra el gateway real
+       default via 192.168.1.1 dev wlan0 proto dhcp src 192.168.1.11
+       - El gateway es lo que aparece despues de "via" (no asumirlo, confirmarlo).
+
+   ping -c 3 192.168.1.11   → ERROR de concepto: es MI propia IP (0.017 ms, ni sale por la
+                              tarjeta de red, la resuelve el kernel).
+   ping -c 3 192.168.1.1    → gateway (LAN):  promedio ~4.6 ms,  ttl=64
+   ping -c 3 8.8.8.8        → Google (WAN):   promedio ~9.7 ms,  ttl=119
+
+   •   Latencia: hacia la WAN tarda ~el doble porque hay mas saltos (router, ISP, Google).
+   •   TTL (Time To Live): cada router le resta 1 al paquete para evitar que circule por
+       siempre. Linux sale con 64; muchos servidores con 128 o 255.
+       128 - 119 = ~9 saltos hasta 8.8.8.8 → evidencia de que se salio de la LAN.

@@ -1,0 +1,61 @@
+                                         SEGUNDA CLASE
+       TEMA 3: TCP VS UDP
+       (Practica hecha en Kali, fecha: 2026-09-19)
+
+==================================================================================================
+   •   Ambos son protocolos de TRANSPORTE (van sobre IP), con filosofias opuestas.
+
+                     TCP                                   UDP
+       Conexion      Orientado a conexion (handshake)      Sin conexion
+       Fiabilidad    Garantiza entrega y orden             No garantiza nada
+       Velocidad     Mas lento (overhead de control)       Mas rapido y liviano
+       Uso tipico    Web, SSH, FTP                         DNS, streaming, VoIP, juegos
+       Flags         SYN, ACK, RST, PSH, FIN...            No tiene flags de control
+
+   •   TCP - Three-Way Handshake:
+           1. SYN      cliente → servidor   "quiero conectarme"
+           2. SYN-ACK  servidor → cliente   "aceptado, yo tambien"
+           3. ACK      cliente → servidor   "listo, empecemos"
+       Despues los datos viajan con [P.] (PUSH-ACK). Si un paquete se pierde, TCP lo
+       retransmite; si llegan desordenados, los reordena.
+
+   •   UDP: manda el datagrama y ya. No hay handshake, ni confirmacion, ni orden garantizado.
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   A) Puerto CERRADO (contra el router, puerto 80)
+      sudo tcpdump -i wlan0 host 192.168.1.1 and tcp -c 10   +   curl http://192.168.1.1 -m 3
+          Flags [S]    ← mi Kali manda SYN
+          Flags [R.]   ← el router responde RST-ACK (no SYN-ACK)
+      Asi se ve un puerto cerrado en TCP: SYN → RST-ACK, sin tercer paso.
+      (nmap -p 80,443,8080,53 192.168.1.1 → todos cerrados)
+
+   B) Puerto ABIERTO propio (handshake completo, en loopback)
+      Terminal 1:  nc -lvnp 4444                       (servidor escuchando)
+      Terminal 2:  sudo tcpdump -i lo port 4444 -c 12  (captura)
+      Terminal 3:  nc 127.0.0.1 4444                   (cliente)
+          [S]   seq 3594031511                    SYN del cliente
+          [S.]  seq 3968176954, ack 3594031512    SYN-ACK (ack = seq del cliente + 1)
+          [.]   ack 1                             ACK final (tcpdump muestra nº relativos)
+      - Un SYN consume un numero de secuencia, por eso el ACK es seq + 1.
+      - El seq inicial es aleatorio en cada conexion.
+
+   C) UDP (mismo esquema)
+      Terminal 1:  nc -ulvp 4444
+      Terminal 2:  sudo tcpdump -i lo port 4444 -c 5
+      Terminal 3:  nc -u 127.0.0.1 4444   (escribir "hola")
+          localhost.57983 > localhost.4444: UDP, length 5
+      1 sola linea, sin saludo previo (length 5 = "hola\n"). Sin flags.
+
+   Comparacion: TCP = 3 paquetes ANTES de enviar datos. UDP = 1 paquete, directo.
+
+   •   Consecuencia para Nmap:
+           TCP: open (SYN-ACK) o closed (RST) → respuesta clara.
+           UDP: si no hay respuesta no se sabe si esta abierto o filtrado por firewall →
+                aparece "open|filtered". Por eso escanear UDP es mas ambiguo y lento.
+
+       Comandos de referencia:
+           sudo nmap -sS -p 80,443 IP        (escaneo TCP SYN)
+           sudo nmap -sU -p 53,123 IP        (escaneo UDP)

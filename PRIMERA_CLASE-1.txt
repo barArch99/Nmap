@@ -1,0 +1,221 @@
+                                         PRIMERA CLASE
+       1.Tema: Direcciones IP
+
+   •   Que es una direccion ip?
+
+Una direccion ip es una direccion logica dentro de una red
+
+   •   Direfencias entre
+   •   ip :etiqueta numérica única que se le asigna a cualquier dispositivo
+
+   •   MAC: Es un identificador físico único que los fabricantes le asignan a cada tarjeta
+       de red (ya sea Wi-Fi o Ethernet) al momento de producirla.
+       Función: A diferencia de la IP (que cambia dependiendo de a qué red te conectes),
+       la MAC nunca cambia y está quemada en el hardware. Sirve para identificar de
+       forma inequívoca a un dispositivo dentro de una misma red local.
+       Ejemplo: Se ve así: A1:B2:C3:D4:E5:F6.
+
+   •   Hostname:Es el nombre que se le asigna a un dispositivo dentro de una red para
+       poder identificarlo fácilmente de forma humana, en lugar de tener que recordarlo
+       por su número IP.
+       Función: Facilita la identificación en redes locales o corporativas. Por ejemplo, en
+       lugar de entrar a una computadora escribiendo 192.168.1.50, puedes identificarla
+       en la red con un hostname como servidor-impresion o laptop-edgar.
+
+   •   Puerto:Es una puerta lógica o canal virtual que permite que un equipo se
+       comunique con programas o servicios específicos a través de una red.
+       Función: Como una sola computadora puede estar navegando por internet,
+       descargando un archivo y chateando al mismo tiempo, los puertos sirven para
+       organizar el tráfico. Cada aplicación utiliza un número de puerto estándar (por
+       ejemplo, el puerto 80 se usa normalmente para páginas web sin seguridad, y el 443
+       para páginas web seguras con HTTPS).
+
+       Protocolo:Es un conjunto de reglas y normas estandarizadas que determinan
+       cómo se deben enviar, recibir y estructurar los datos entre diferentes dispositivos
+       en una red.
+       Función: Garantizan que dispositivos de diferentes marcas y sistemas operativos
+       puedan "entenderse" entre sí.
+       Ejemplos comunes:
+           o HTTP/HTTPS: Para navegar por páginas web.
+           o TCP/IP: Los protocolos base para la transmisión de datos en internet.
+           o DNS: El protocolo encargado de traducir nombres de dominio (como
+             google.com) a direcciones IP.
+
+       --------------------------------------------------------------------------------------------------
+
+       IP → identifica el dispositivo/interfaz en la red
+
+       Puerto → identifica un servicio/proceso
+
+       --------------------------------------------------------------------------------------------------
+
+       Estructura de la IPv4:
+
+       Esta compuesta por 4 octetos cada uno puede ir de 0 a 255 y su estructura se ve
+       algo asi: 192.168.1.19
+
+       -------------------------------------------------------------------------------------------------
+
+Mascaras de red:
+
+   •   La función de la máscara: Entendiste perfecto que su trabajo es definir y
+       delimitar cuál es la red (el vecindario), poniendo la frontera entre lo local y el
+       exterior.
+   •   El rol de los ceros: Comprendiste muy bien que los ceros indican el espacio
+       disponible para los dispositivos, calculando exactamente cuántas IPs se pueden
+       conectar restando las dos direcciones reservadas.
+
+       La máscara de red es un número de 32 bits que divide una dirección IP en dos
+       partes: una para identificar la red y otra para identificar al dispositivo o host
+
+       Pasar un numero ip a binario:
+
+       https://youtu.be/-AsYSB8QOEQ?si=0IHoZQGMD8UhZWVL
+Entre menos numeros tenga la mascara de red es en donde mas dispositivos se
+podran conectar a la red.
+
+------------------------------------------------------------------------------------------------------------
+---
+1. Network (Dirección de Red / Network ID)
+
+   •   ¿Qué es?: Es la primera dirección IP de un rango de subred.
+   •   Función: Representa a toda la red o subred en su conjunto. No se puede asignar a
+       ningún dispositivo (host) individual, como una computadora o un router, porque
+       sirve como la "etiqueta de identificación" de esa red.
+   •   Cómo identificarla: Es el resultado de aplicar una operación lógica AND entre
+       cualquier dirección IP de la red y su máscara de subred. Todos los bits de la parte de
+       host están en 0.
+
+2. First Host (Primer Host)
+
+   •   ¿Qué es?: Es la dirección IP utilizable más baja dentro del rango de esa subred.
+   •   Función: Es la primera dirección que sí se le puede asignar a un dispositivo real
+       (una PC, un servidor, una impresora, etc.) o configurarse como la puerta de enlace
+       predeterminada (default gateway).
+   •   Cómo identificarla: Es exactamente la dirección inmediatamente posterior a la
+       dirección de red (Network + 1).
+
+3. Last Host (Último Host)
+
+   •   ¿Qué es?: Es la dirección IP utilizable más alta dentro del rango de esa subred.
+   •   Función: Al igual que el primer host, es una dirección disponible para asignarse a
+       cualquier dispositivo de la red antes de llegar a la dirección de difusión.
+   •   Cómo identificarla: Es la dirección inmediatamente anterior a la dirección de
+       broadcast (Broadcast - 1).
+
+4. Broadcast (Dirección de Difusión)
+
+   •   ¿Qué es?: Es la última dirección IP dentro del rango de la subred.
+   •   Función: Se utiliza para enviar datos a todos los dispositivos que están conectados
+       a esa misma subred al mismo tiempo. Al igual que la dirección de red, no se le puede
+       asignar a un dispositivo individual.
+   •   Cómo identificarla: Es la dirección donde todos los bits de la parte de host están en
+       1.
+
+Ejemplo Práctico
+
+Imagina que tienes una red con la IP 192.168.1.0 y una máscara de subred 255.255.255.0
+(lo que equivale a un sufijo /24, es decir, 256 direcciones totales):
+   •   Network (Red): 192.168.1.0 (Identifica la red)
+   •   First Host (Primer Host): 192.168.1.1 (Primer equipo utilizable)
+   •   Last Host (Último Host): 192.168.1.254 (Último equipo utilizable)
+   •   Broadcast: 192.168.1.255 (Para enviar mensajes a toda la red)
+
+(Nota: En este ejemplo, las direcciones utilizables para dispositivos van desde la .1 hasta
+la .254, lo que da un total de 254 hosts posibles).
+
+Como calcular :
+
+https://youtu.be/gAXS0x1kwWw?si=MGUg4KVRGMAbll8C
+
+
+
+
+       ------------------------------------------------------------------------------------------------------------
+          IP privada vs IP publica:
+
+          Una dirección IP pública es el identificador único que te asigna tu proveedor de
+          internet para que tu red sea visible a nivel global, mientras que una IP privada es la
+          numeración interna que el enrutador (router) da a cada dispositivo dentro de tu
+          casa u oficina
+
+          https://youtu.be/pcYIsXtq3ZM?si=cAxD3DAsh21dITWT
+
+
+
+
+          --------------------------------------------------------------------------------------------
+
+NIVEL 7 — Tu propia Kali
+
+Aquí empieza la práctica real.
+
+En Kali ejecuta:
+
+ip addr
+
+Qué hace: muestra las interfaces de red y sus direcciones IP.
+
+Busca algo parecido a:
+lo
+eth0
+wlan0
+
+Por ejemplo:
+
+eth0
+  inet 192.168.1.19/24
+
+Ahora interpreta:
+
+192.168.1.19/24
+
+sin buscarlo en Internet.
+
+
+
+
+NIVEL 8 — Gateway
+
+Ejecuta:
+
+ip route
+
+Qué hace: muestra las rutas que utiliza Kali para comunicarse con otras redes.
+
+Puedes encontrar algo como:
+
+default via 192.168.1.1 dev eth0
+
+Interpretación:
+
+Tu IP:
+192.168.1.19
+
+Gateway:
+192.168.1.1
+
+Red:
+192.168.1.0/24
+NIVEL 9 — Conectividad
+
+Aprende ping.
+
+ping 192.168.1.1
+
+Qué hace: comprueba si puedes comunicarte con esa dirección mediante ICMP.
+
+Después:
+
+ping 8.8.8.8
+
+Esto te permite diferenciar problemas de:
+
+LAN
+↓
+Gateway
+↓
+Internet
+
+----------------------------------------------------------------------------------------------------------
+

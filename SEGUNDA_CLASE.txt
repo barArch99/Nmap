@@ -1,0 +1,188 @@
+                                         SEGUNDA CLASE
+       Temas: LAN/WAN/Ethernet/Wi-Fi, MAC y ARP, TCP vs UDP
+       (Practica hecha en Kali, fecha: 2026-09-19)
+
+==================================================================================================
+TEMA 1: LAN, WAN, ETHERNET Y WI-FI
+==================================================================================================
+
+   •   LAN (Local Area Network): red local de alcance corto (casa, oficina, aula). Los
+       dispositivos comparten el mismo segmento (ej. 192.168.1.0/24) y se hablan sin salir a
+       internet.
+
+   •   WAN (Wide Area Network): red que conecta LANs separadas geograficamente. Internet es
+       la WAN mas grande que existe (red de redes: ISPs, cables submarinos, backbones).
+
+   •   Ethernet: red cableada (RJ45). Interfaz en Linux: eth0 / enp0s3.
+   •   Wi-Fi: red inalambrica (802.11, "WLAN"). Interfaz en Linux: wlan0 / wlp2s0.
+
+   •   Gateway (router): la "puerta" de la LAN. Todo lo que sale a la WAN pasa por el.
+
+       Analogia del edificio:
+           LAN     = el interior del edificio (cuartos que se hablan sin salir)
+           Gateway = la puerta principal
+           WAN     = la ciudad fuera del edificio
+
+       LAN vs WAN:
+           Alcance:    LAN local            | WAN global / entre ciudades y paises
+           Velocidad:  LAN muy alta         | WAN variable, mas latencia
+           Propiedad:  LAN tuya (tu router) | WAN de terceros (ISPs)
+           IP ejemplo: 192.168.1.11 privada | 8.8.8.8 publica
+
+   •   Por que importa para Nmap: escanear 192.168.1.0/24 es escanear tu LAN. Escanear una IP
+       publica cruza el gateway, el ISP, NAT y firewalls intermedios (cambia lo que se ve).
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   ip -br addr      → interfaces e IPs en formato resumido
+       lo      UNKNOWN  127.0.0.1/8
+       eth0    DOWN                          (Ethernet sin cable)
+       wlan0   UP       192.168.1.11/24      (conectado por Wi-Fi)
+       - fe80::... es IPv6 link-local: se autoasigna, solo sirve dentro del mismo segmento.
+
+   ip route         → muestra el gateway real
+       default via 192.168.1.1 dev wlan0 proto dhcp src 192.168.1.11
+       - El gateway es lo que aparece despues de "via" (no asumirlo, confirmarlo).
+
+   ping -c 3 192.168.1.11   → ERROR de concepto: es MI propia IP (0.017 ms, ni sale por la
+                              tarjeta de red, la resuelve el kernel).
+   ping -c 3 192.168.1.1    → gateway (LAN):  promedio ~4.6 ms,  ttl=64
+   ping -c 3 8.8.8.8        → Google (WAN):   promedio ~9.7 ms,  ttl=119
+
+   •   Latencia: hacia la WAN tarda ~el doble porque hay mas saltos (router, ISP, Google).
+   •   TTL (Time To Live): cada router le resta 1 al paquete para evitar que circule por
+       siempre. Linux sale con 64; muchos servidores con 128 o 255.
+       128 - 119 = ~9 saltos hasta 8.8.8.8 → evidencia de que se salio de la LAN.
+
+==================================================================================================
+TEMA 2: MAC Y ARP
+==================================================================================================
+
+   •   MAC: identificador fisico de la tarjeta de red, grabado de fabrica. No cambia con la
+       red. Los primeros 3 bytes (OUI) identifican al fabricante.
+
+   •   ARP (Address Resolution Protocol): traduce IP → MAC dentro de la misma LAN.
+
+       Por que existe: a nivel Wi-Fi/Ethernet viajan TRAMAS dirigidas por MAC, no por IP.
+       (IP = nombre de la persona, MAC = direccion exacta de su casa.)
+
+       Como funciona:
+           1. Pregunta (broadcast): "¿Quien tiene la IP 192.168.1.1? Dime tu MAC."
+           2. Respuesta: el dueño contesta con su MAC.
+           3. Memoria: se guarda IP↔MAC en la cache ARP para no volver a preguntar.
+
+       Limite: ARP solo funciona dentro de la LAN. Nunca cruza a la WAN.
+       En IPv6 el equivalente se llama NDP (Neighbor Discovery Protocol).
+
+   •   Por que importa para Nmap: en una LAN, nmap -sn usa ARP (no ICMP): es mas rapido y
+       confiable, y por eso muestra MAC + fabricante de cada host.
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   ip -br link      → capa de enlace (MACs)
+       lo      00:00:00:00:00:00            (loopback, no tiene MAC real)
+       eth0    38:a7:46:51:3c:fc  <NO-CARRIER,...>   (NO-CARRIER = sin cable)
+       wlan0   14:b5:cd:a7:ae:3f  <...UP,LOWER_UP>   (mi MAC Wi-Fi)
+
+   ip neigh         → cache ARP
+       192.168.1.1 dev wlan0 lladdr 74:93:da:d0:77:a0 REACHABLE
+       fe80::7693:daff:fed0:77a0 dev wlan0 lladdr 74:93:da:d0:77:a0 router STALE
+       - REACHABLE = confirmada recientemente. STALE = obsoleta, se re-verifica al usarla.
+       - Misma MAC para IPv4 e IPv6: es el mismo router.
+
+   sudo nmap -sn 192.168.1.0/24   → descubrimiento de hosts (tardo ~436 s por Wi-Fi)
+       IP     MAC (fabricante)                        Probable dispositivo
+       .1     Askey Computer                          router/modem
+       .2     Shenzhen Bilian Electronic              dispositivo IoT generico
+       .3     Motorola Mobility (Lenovo)              celular Motorola
+       .4     Realme Chongqing                        celular Realme
+       .5 .8 .9 .10   Unknown                         MACs aleatorias (ver abajo)
+       .11    (sin MAC)                               mi propia Kali
+
+   •   Mi propia IP no muestra MAC: no necesito ARP para hablar conmigo mismo.
+   •   Dato del error: "nmap -sn 192.168.1.1" escanea UNA sola IP; para toda la red se usa
+       el rango con CIDR (192.168.1.0/24).
+
+   •   MACs "Unknown" = MACs administradas localmente (aleatorias/privadas):
+       Si el segundo digito hexadecimal del primer byte es 2, 6, A o E, la MAC NO viene de
+       fabrica. iOS y Android modernos generan una MAC distinta por cada red Wi-Fi para que
+       no se pueda rastrear el dispositivo.
+           C2:32:5D:31:C2:AD   → 2
+           C6:C9:94:10:11:73   → 6
+           AE:3B:75:F4:BD:7F   → E
+           32:17:72:9E:E1:3D   → 2
+       Las MACs normales (Askey 74, Motorola 50, Realme A8, Shenzhen F0) tienen 4, 0, 8, 0.
+
+==================================================================================================
+TEMA 3: TCP VS UDP
+==================================================================================================
+
+   •   Ambos son protocolos de TRANSPORTE (van sobre IP), con filosofias opuestas.
+
+                     TCP                                   UDP
+       Conexion      Orientado a conexion (handshake)      Sin conexion
+       Fiabilidad    Garantiza entrega y orden             No garantiza nada
+       Velocidad     Mas lento (overhead de control)       Mas rapido y liviano
+       Uso tipico    Web, SSH, FTP                         DNS, streaming, VoIP, juegos
+       Flags         SYN, ACK, RST, PSH, FIN...            No tiene flags de control
+
+   •   TCP - Three-Way Handshake:
+           1. SYN      cliente → servidor   "quiero conectarme"
+           2. SYN-ACK  servidor → cliente   "aceptado, yo tambien"
+           3. ACK      cliente → servidor   "listo, empecemos"
+       Despues los datos viajan con [P.] (PUSH-ACK). Si un paquete se pierde, TCP lo
+       retransmite; si llegan desordenados, los reordena.
+
+   •   UDP: manda el datagrama y ya. No hay handshake, ni confirmacion, ni orden garantizado.
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   A) Puerto CERRADO (contra el router, puerto 80)
+      sudo tcpdump -i wlan0 host 192.168.1.1 and tcp -c 10   +   curl http://192.168.1.1 -m 3
+          Flags [S]    ← mi Kali manda SYN
+          Flags [R.]   ← el router responde RST-ACK (no SYN-ACK)
+      Asi se ve un puerto cerrado en TCP: SYN → RST-ACK, sin tercer paso.
+      (nmap -p 80,443,8080,53 192.168.1.1 → todos cerrados)
+
+   B) Puerto ABIERTO propio (handshake completo, en loopback)
+      Terminal 1:  nc -lvnp 4444                       (servidor escuchando)
+      Terminal 2:  sudo tcpdump -i lo port 4444 -c 12  (captura)
+      Terminal 3:  nc 127.0.0.1 4444                   (cliente)
+          [S]   seq 3594031511                    SYN del cliente
+          [S.]  seq 3968176954, ack 3594031512    SYN-ACK (ack = seq del cliente + 1)
+          [.]   ack 1                             ACK final (tcpdump muestra nº relativos)
+      - Un SYN consume un numero de secuencia, por eso el ACK es seq + 1.
+      - El seq inicial es aleatorio en cada conexion.
+
+   C) UDP (mismo esquema)
+      Terminal 1:  nc -ulvp 4444
+      Terminal 2:  sudo tcpdump -i lo port 4444 -c 5
+      Terminal 3:  nc -u 127.0.0.1 4444   (escribir "hola")
+          localhost.57983 > localhost.4444: UDP, length 5
+      1 sola linea, sin saludo previo (length 5 = "hola\n"). Sin flags.
+
+   Comparacion: TCP = 3 paquetes ANTES de enviar datos. UDP = 1 paquete, directo.
+
+   •   Consecuencia para Nmap:
+           TCP: open (SYN-ACK) o closed (RST) → respuesta clara.
+           UDP: si no hay respuesta no se sabe si esta abierto o filtrado por firewall →
+                aparece "open|filtered". Por eso escanear UDP es mas ambiguo y lento.
+
+       Comandos de referencia:
+           sudo nmap -sS -p 80,443 IP        (escaneo TCP SYN)
+           sudo nmap -sU -p 53,123 IP        (escaneo UDP)
+
+==================================================================================================
+PENDIENTE
+==================================================================================================
+
+   [ ] Paso 4 de TCP vs UDP: correr  sudo nmap -sU -p 53,67,123,161 192.168.1.1  e
+       interpretar open / closed / open|filtered (no se llego a ejecutar).
+   [ ] Puertos y sockets (falta la parte de sockets)
+   [ ] DHCP y NAT

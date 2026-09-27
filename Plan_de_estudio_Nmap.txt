@@ -1,0 +1,293 @@
+Nivel: principiante → intermedio | Enfoque: práctica en equipos propios
+y laboratorios autorizados
+
+Objetivo
+
+Aprender Nmap de forma ordenada, entendiendo primero redes y después los
+tipos de escaneo, interpretación de resultados, detección de servicios,
+enumeración y automatización básica. La meta no es memorizar comandos,
+sino saber cuándo usar cada técnica y cómo interpretar lo que devuelve.
+
+Tiempo estimado
+
+Con 45–60 minutos al día, 5 días por semana: aproximadamente 4–6
+semanas. Con 1–2 horas al día: aproximadamente 3–4 semanas. Para
+dominarlo a un nivel sólido y combinarlo con redes, Linux y
+laboratorios: 2–3 meses.
+
+Semana 0 — Fundamentos mínimos de redes (2–3 días)
+
+Estado actual (actualizado tras Primera Clase):
+
+-   Ya vistos en la Primera Clase: IP privada/pública, CIDR y máscaras,
+    ICMP (ping). Puertos y gateway se tocaron parcialmente.
+
+-   En curso ahora: TCP vs UDP (con ejemplos prácticos).
+
+Temas:
+
+-   [x] IP privada y pública — visto en Primera Clase
+
+-   [x] CIDR y máscaras (/24, /16) — visto en Primera Clase
+
+-   [x] LAN, WAN, Ethernet y Wi‑Fi — visto en Segunda Clase con práctica
+    (ip -br addr, ip route, ping a gateway vs 8.8.8.8, interpretación de
+    latencia y TTL)
+
+-   [x] MAC y ARP — visto en Segunda Clase con práctica (ip -br link,
+    ip neigh, nmap -sn 192.168.1.0/24 mostrando MAC/fabricante por ARP,
+    e identificación de MACs aleatorias/privadas vía el bit
+    locally-administered)
+
+-   [ ] TCP vs UDP — 👉 EN CURSO (tema actual)
+
+-   [~] Puertos y sockets — visto parcialmente en Primera Clase (puertos
+    sí, sockets aún no)
+
+-   [x] ICMP — visto en Primera Clase (ping)
+
+-   [~] DNS, DHCP, gateway y NAT — visto parcialmente en Primera Clase
+    (gateway y mención breve de DNS; falta DHCP y NAT)
+
+Comandos/práctica:
+
+-   ip -br addr — muestra interfaces e IPs en formato resumido.
+
+-   ip route — muestra las rutas que usa Linux.
+
+-   ip neigh — muestra vecinos conocidos mediante ARP/ND.
+
+-   ping -c 4 IP — comprueba conectividad mediante ICMP.
+
+Semana 1 — Nmap básico (4–5 días)
+
+Temas:
+
+-   Qué es Nmap y para qué sirve
+
+-   Sintaxis y objetivos
+
+-   Descubrimiento de hosts
+
+-   Escaneo de puertos TCP
+
+-   open / closed / filtered
+
+-   Interpretación de resultados
+
+Comandos/práctica:
+
+-   nmap IP — escaneo TCP básico de los puertos comunes.
+
+-   nmap -sn 192.168.1.0/24 — descubre hosts sin hacer un escaneo de
+    puertos.
+
+-   nmap -p 80,443 IP — escanea puertos específicos.
+
+-   nmap -p- IP — escanea todos los puertos TCP.
+
+Semana 2 — Técnicas de escaneo (5–6 días)
+
+Temas:
+
+-   TCP Connect (-sT)
+
+-   SYN scan (-sS)
+
+-   UDP scan (-sU)
+
+-   Escaneo por rangos
+
+-   Excluir hosts/puertos
+
+-   Velocidad (-T0 a -T5)
+
+-   Cuándo evitar escaneos agresivos
+
+Comandos/práctica:
+
+-   sudo nmap -sS IP — escaneo SYN; requiere privilegios.
+
+-   sudo nmap -sT IP — realiza conexiones TCP completas.
+
+-   sudo nmap -sU -p 53,123 IP — prueba puertos UDP seleccionados.
+
+-   nmap -p 1-1000 IP — escanea un rango concreto.
+
+Semana 3 — Detección de servicios y versiones (4–5 días)
+
+Temas:
+
+-   Detección de versiones (-sV)
+
+-   Intensidad de detección
+
+-   Razones de tcpwrapped
+
+-   Banners y respuestas
+
+-   Sistema operativo (-O)
+
+-   Combinación de técnicas
+
+Comandos/práctica:
+
+-   sudo nmap -sV IP — intenta identificar servicios y versiones.
+
+-   sudo nmap -O IP — intenta detectar el sistema operativo.
+
+-   sudo nmap -A IP — combina varias técnicas; úsalo en laboratorios
+    propios.
+
+-   nmap --reason IP — muestra razones para estados de puertos/hosts.
+
+Semana 4 — NSE y enumeración (5–6 días)
+
+Temas:
+
+-   Qué es NSE (Nmap Scripting Engine)
+
+-   Categorías de scripts
+
+-   Scripts seguros/default
+
+-   Enumeración de servicios
+
+-   Leer la documentación del script
+
+-   Evitar ejecutar scripts sin entender su efecto
+
+Comandos/práctica:
+
+-   nmap -sC IP — ejecuta los scripts NSE de categoría default.
+
+-   nmap --script-help nombre — muestra ayuda de un script.
+
+-   nmap --script 'default and safe' IP — limita la ejecución a
+    categorías apropiadas para práctica.
+
+-   nmap --script-updatedb — actualiza la base local de scripts si
+    corresponde.
+
+Semana 5 — Automatización, salida y análisis (4–5 días)
+
+Temas:
+
+-   Guardar resultados (-oN, -oX, -oG, -oA)
+
+-   Comparar escaneos
+
+-   Filtrar resultados
+
+-   Uso de grep/awk básico
+
+-   Crear una metodología repetible
+
+Comandos/práctica:
+
+-   nmap -oN resultado.txt IP — guarda salida legible en texto.
+
+-   nmap -oA escaneo IP — guarda varias salidas con un mismo prefijo.
+
+-   nmap -vv IP — aumenta el nivel de detalle de la salida.
+
+Semana 6 — Proyecto final (3–5 sesiones)
+
+Temas:
+
+-   Crear un laboratorio con 2–3 máquinas autorizadas
+
+-   Descubrir hosts
+
+-   Identificar puertos
+
+-   Detectar servicios
+
+-   Enumerar con NSE
+
+-   Documentar hallazgos
+
+-   Comparar escaneos y explicar cada resultado
+
+Comandos/práctica:
+
+-   No buscar 'el comando más fuerte'. Diseñar una secuencia:
+    descubrimiento → puertos → servicios → enumeración → documentación.
+
+-   Repetir el proyecto con diferentes sistemas/servicios y explicar por
+    qué cambia el resultado.
+
+Orden recomendado de aprendizaje de escaneos
+
+1) Descubrimiento de hosts → 2) puertos comunes → 3) puertos específicos
+→ 4) todos los puertos TCP → 5) detección de servicios → 6) UDP → 7)
+detección de SO → 8) NSE → 9) guardar y analizar resultados.
+
+Ejercicios prácticos
+
+1.  Identificar tus interfaces con ip -br addr.
+
+2.  Descubrir los hosts de una red de laboratorio con nmap -sn.
+
+3.  Comparar un escaneo de puertos comunes con -p-.
+
+4.  Encontrar un puerto abierto y usar -sV para identificar el servicio.
+
+5.  Comparar TCP (-sT/-sS) y UDP (-sU) en una máquina de laboratorio.
+
+6.  Probar --reason y explicar por qué cada puerto aparece
+    open/closed/filtered.
+
+7.  Usar -sC en una máquina de práctica y leer cada resultado NSE.
+
+8.  Guardar un escaneo con -oA y redactar un pequeño informe.
+
+Documentación principal
+
+Nmap Reference Guide: https://nmap.org/book/man.html
+
+Nmap Network Scanning (libro oficial): https://nmap.org/book/
+
+Nmap NSE Documentation: https://nmap.org/book/nse.html
+
+Nmap Port Scanning Techniques: https://nmap.org/book/port-scanning.html
+
+Nmap Service and Version Detection: https://nmap.org/book/vscan.html
+
+Nmap OS Detection: https://nmap.org/book/osdetect.html
+
+Nmap Output: https://nmap.org/book/output.html
+
+TryHackMe — Nmap: https://tryhackme.com/room/nmap
+
+Regla de práctica
+
+Practicar únicamente sobre dispositivos propios, máquinas de laboratorio
+o sistemas para los que tengas autorización. En cada comando debes poder
+responder: qué escanea, qué protocolo usa, qué información busca y cómo
+interpretar el resultado.
+
+Checklist para terminar el plan
+
+☐ Entiendo IP, MAC, CIDR, TCP, UDP y puertos.
+
+☐ Puedo descubrir hosts de una LAN.
+
+☐ Puedo elegir qué puertos escanear y explicar por qué.
+
+☐ Entiendo open, closed y filtered.
+
+☐ Puedo escanear todos los puertos TCP.
+
+☐ Puedo identificar servicios con -sV.
+
+☐ Entiendo por qué algunos servicios aparecen como unknown/tcpwrapped.
+
+☐ Conozco las diferencias básicas entre TCP y UDP.
+
+☐ Puedo usar NSE de forma controlada.
+
+☐ Puedo guardar, leer y documentar resultados de Nmap.
+
+☐ Puedo realizar un reconocimiento completo en un laboratorio autorizado
+sin depender de copiar comandos.

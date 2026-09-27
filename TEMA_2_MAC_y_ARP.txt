@@ -1,0 +1,61 @@
+                                         SEGUNDA CLASE
+       TEMA 2: MAC Y ARP
+       (Practica hecha en Kali, fecha: 2026-09-19)
+
+==================================================================================================
+   •   MAC: identificador fisico de la tarjeta de red, grabado de fabrica. No cambia con la
+       red. Los primeros 3 bytes (OUI) identifican al fabricante.
+
+   •   ARP (Address Resolution Protocol): traduce IP → MAC dentro de la misma LAN.
+
+       Por que existe: a nivel Wi-Fi/Ethernet viajan TRAMAS dirigidas por MAC, no por IP.
+       (IP = nombre de la persona, MAC = direccion exacta de su casa.)
+
+       Como funciona:
+           1. Pregunta (broadcast): "¿Quien tiene la IP 192.168.1.1? Dime tu MAC."
+           2. Respuesta: el dueño contesta con su MAC.
+           3. Memoria: se guarda IP↔MAC en la cache ARP para no volver a preguntar.
+
+       Limite: ARP solo funciona dentro de la LAN. Nunca cruza a la WAN.
+       En IPv6 el equivalente se llama NDP (Neighbor Discovery Protocol).
+
+   •   Por que importa para Nmap: en una LAN, nmap -sn usa ARP (no ICMP): es mas rapido y
+       confiable, y por eso muestra MAC + fabricante de cada host.
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+
+   ip -br link      → capa de enlace (MACs)
+       lo      00:00:00:00:00:00            (loopback, no tiene MAC real)
+       eth0    38:a7:46:51:3c:fc  <NO-CARRIER,...>   (NO-CARRIER = sin cable)
+       wlan0   14:b5:cd:a7:ae:3f  <...UP,LOWER_UP>   (mi MAC Wi-Fi)
+
+   ip neigh         → cache ARP
+       192.168.1.1 dev wlan0 lladdr 74:93:da:d0:77:a0 REACHABLE
+       fe80::7693:daff:fed0:77a0 dev wlan0 lladdr 74:93:da:d0:77:a0 router STALE
+       - REACHABLE = confirmada recientemente. STALE = obsoleta, se re-verifica al usarla.
+       - Misma MAC para IPv4 e IPv6: es el mismo router.
+
+   sudo nmap -sn 192.168.1.0/24   → descubrimiento de hosts (tardo ~436 s por Wi-Fi)
+       IP     MAC (fabricante)                        Probable dispositivo
+       .1     Askey Computer                          router/modem
+       .2     Shenzhen Bilian Electronic              dispositivo IoT generico
+       .3     Motorola Mobility (Lenovo)              celular Motorola
+       .4     Realme Chongqing                        celular Realme
+       .5 .8 .9 .10   Unknown                         MACs aleatorias (ver abajo)
+       .11    (sin MAC)                               mi propia Kali
+
+   •   Mi propia IP no muestra MAC: no necesito ARP para hablar conmigo mismo.
+   •   Dato del error: "nmap -sn 192.168.1.1" escanea UNA sola IP; para toda la red se usa
+       el rango con CIDR (192.168.1.0/24).
+
+   •   MACs "Unknown" = MACs administradas localmente (aleatorias/privadas):
+       Si el segundo digito hexadecimal del primer byte es 2, 6, A o E, la MAC NO viene de
+       fabrica. iOS y Android modernos generan una MAC distinta por cada red Wi-Fi para que
+       no se pueda rastrear el dispositivo.
+           C2:32:5D:31:C2:AD   → 2
+           C6:C9:94:10:11:73   → 6
+           AE:3B:75:F4:BD:7F   → E
+           32:17:72:9E:E1:3D   → 2
+       Las MACs normales (Askey 74, Motorola 50, Realme A8, Shenzhen F0) tienen 4, 0, 8, 0.

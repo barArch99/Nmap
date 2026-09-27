@@ -1,0 +1,111 @@
+                                   INFORME DE ESTUDIO - NMAP
+                                   Semana 0: Fundamentos de redes
+                                   Sesion: 2026-09-19 (Segunda Clase)
+
+==================================================================================================
+1. RESUMEN DE LA SESION
+==================================================================================================
+
+   Se estudiaron 3 temas de la Semana 0 del plan, siempre con teoria + practica en el propio
+   Kali (hostname REVENGE, wlan0, 192.168.1.11/24, gateway 192.168.1.1):
+
+       Tema 1: LAN, WAN, Ethernet y Wi-Fi   → TEMA_1_LAN_WAN_Ethernet_WiFi.txt
+       Tema 2: MAC y ARP                    → TEMA_2_MAC_y_ARP.txt
+       Tema 3: TCP vs UDP                   → TEMA_3_TCP_vs_UDP.txt
+
+   Compilacion completa de la clase: SEGUNDA_CLASE.txt
+   Clase anterior (IP, CIDR, mascaras, puertos, ICMP): PRIMERA_CLASE-1.txt
+   Plan general: Plan_de_estudio_Nmap.txt (temas 1 y 2 marcados [x], tema 3 en curso)
+
+==================================================================================================
+2. QUE SE APRENDIO (idea central de cada tema)
+==================================================================================================
+
+   Tema 1 - LAN/WAN:
+       La LAN es el "edificio", el gateway la "puerta" y la WAN la "ciudad". Salir a la WAN
+       cuesta mas latencia y mas saltos (TTL). Para Nmap importa porque escanear tu LAN no es
+       lo mismo que escanear una IP publica (NAT, firewalls, ISP).
+
+   Tema 2 - MAC y ARP:
+       Dentro de la LAN los paquetes se entregan por MAC, no por IP; ARP traduce IP → MAC y
+       guarda el resultado en la cache. Nmap -sn en LAN usa ARP, por eso muestra MAC y
+       fabricante. Las MACs "Unknown" con 2/6/A/E como segundo digito son MACs aleatorias.
+
+   Tema 3 - TCP vs UDP:
+       TCP negocia (SYN, SYN-ACK, ACK) y confirma; UDP dispara sin avisar. En Nmap eso hace
+       que TCP tenga respuestas claras (open/closed) y UDP sea ambiguo (open|filtered).
+
+==================================================================================================
+3. TODOS LOS COMANDOS PRACTICADOS
+==================================================================================================
+
+   Comando                                             Para que sirve
+   --------------------------------------------------  --------------------------------------
+   ip -br addr                                         Interfaces, estado e IPs (resumido)
+   ip route                                            Rutas y gateway (default via ...)
+   ip -br link                                         Interfaces y sus MACs
+   ip neigh                                            Cache ARP/NDP (IP ↔ MAC, estado)
+   ping -c 3 IP                                        ICMP: latencia y TTL
+   sudo nmap -sn 192.168.1.0/24                        Descubrir hosts de la LAN (ARP) + MAC
+   sudo nmap -p 80,443,8080,53 192.168.1.1             Escaneo de puertos TCP concretos
+   sudo tcpdump -i wlan0 host 192.168.1.1 and tcp -c 10   Capturar trafico TCP hacia el router
+   curl http://192.168.1.1 -m 3                        Generar trafico HTTP (max 3 s)
+   nc -lvnp 4444                                       Servidor TCP de prueba (escucha)
+   nc 127.0.0.1 4444                                   Cliente TCP
+   nc -ulvp 4444 / nc -u 127.0.0.1 4444                Servidor / cliente UDP
+   sudo tcpdump -i lo port 4444 -c N                   Capturar en loopback (puerto 4444)
+
+==================================================================================================
+4. RESULTADOS CLAVE DE MI PRACTICA
+==================================================================================================
+
+   - Conectado por Wi-Fi (wlan0 UP, 192.168.1.11/24); Ethernet (eth0) sin cable (NO-CARRIER).
+   - Gateway: 192.168.1.1 (MAC 74:93:DA:D0:77:A0, fabricante Askey Computer).
+   - Mi MAC Wi-Fi: 14:b5:cd:a7:ae:3f. Mi MAC Ethernet: 38:a7:46:51:3c:fc.
+   - Latencia: gateway ~4.6 ms (ttl 64) vs 8.8.8.8 ~9.7 ms (ttl 119, ~9 saltos).
+   - nmap -sn encontro 9 hosts en la LAN (router, 1 dispositivo IoT, 2 celulares, 4 con MAC
+     aleatoria, y mi Kali). El escaneo por Wi-Fi tardo ~436 s.
+   - Puertos 80/443/8080/53 TCP del router: todos cerrados (respuesta RST).
+   - Handshake TCP completo capturado en loopback: [S] → [S.] → [.].
+   - UDP en loopback: 1 solo paquete, sin handshake ("UDP, length 5").
+
+==================================================================================================
+5. ERRORES Y CORRECCIONES (lo que mas enseño)
+==================================================================================================
+
+   1. Hice ping a mi propia IP (192.168.1.11) creyendo que era el gateway. Salio 0.017 ms
+      porque el paquete nunca sale de la maquina. Solucion: confirmar el gateway con
+      "ip route" y hacer ping a 192.168.1.1.
+   2. Escaneé "nmap -sn 192.168.1.1" (una IP) esperando ver toda la red. Para toda la LAN
+      hay que usar el rango CIDR: 192.168.1.0/24.
+   3. tcpdump contra el router no mostro handshake completo porque el puerto 80 estaba
+      cerrado (SYN → RST). Solucion: crear un puerto abierto propio con "nc -lvnp 4444" y
+      capturar en loopback.
+   4. Una pegada de salida llego vacia; hubo que volver a pegarla (revisar antes de enviar).
+
+==================================================================================================
+6. CONEXION CON NMAP (por que sirve todo esto)
+==================================================================================================
+
+   - Entender LAN/WAN → saber que estoy escaneando y que obstaculos puede haber.
+   - Entender ARP/MAC → interpretar la salida de "nmap -sn" y detectar dispositivos.
+   - Entender TCP/UDP → interpretar open / closed / filtered / open|filtered y saber por que
+     -sS (TCP SYN) es claro y -sU (UDP) es lento y ambiguo.
+
+==================================================================================================
+7. PENDIENTE / PROXIMOS PASOS
+==================================================================================================
+
+   [ ] Ejecutar y analizar: sudo nmap -sU -p 53,67,123,161 192.168.1.1
+   [ ] Puertos y sockets (falta la parte de sockets)
+   [ ] DHCP y NAT
+   [ ] Marcar TCP vs UDP como [x] en Plan_de_estudio_Nmap.txt al terminar el paso 4
+   [ ] Pasar a la Semana 1 del plan: Nmap basico (sintaxis, descubrimiento, escaneo de
+       puertos TCP, open/closed/filtered)
+
+==================================================================================================
+8. NOTA DE ETICA
+==================================================================================================
+
+   Toda la practica se hizo sobre mi propia maquina y mi propia red (localhost, mi router y
+   mi LAN domestica). Nmap solo se usa en equipos propios o laboratorios autorizados.
