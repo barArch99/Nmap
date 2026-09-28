@@ -1,0 +1,138 @@
+                                         TERCERA CLASE
+       Temas: Puertos y Sockets, ICMP (repaso aplicado a Nmap), DNS / DHCP / Gateway / NAT
+       (Practica en BlackArch - host 'blackarch', usuario ecorp - fecha: 2026-09-28)
+
+       Pendientes que cierra esta clase (segun Plan_de_estudio_Nmap.txt):
+           [~] Puertos y sockets     → faltaba: sockets
+           [x] ICMP                  → repaso enfocado a como lo usa Nmap
+           [~] DNS, DHCP, gateway, NAT → faltaba: DHCP y NAT (y DNS a fondo)
+
+==================================================================================================
+TEMA 4: PUERTOS Y SOCKETS
+==================================================================================================
+
+   •   Repaso: la IP identifica al EQUIPO; el PUERTO identifica al SERVICIO/PROCESO dentro
+       de ese equipo. Es un numero de 16 bits → 0 a 65535, separado para TCP y para UDP
+       (el 53/tcp y el 53/udp son puertos distintos).
+
+       Rangos:
+           0 - 1023        Bien conocidos (well-known): 22 SSH, 53 DNS, 80 HTTP, 443 HTTPS
+                           En Linux solo root puede escuchar en ellos.
+           1024 - 49151    Registrados: 3306 MySQL, 3389 RDP, 8080 HTTP alterno
+           49152 - 65535   Dinamicos / efimeros: los usa el CLIENTE como puerto de origen
+                           (en Linux el rango real: cat /proc/sys/net/ipv4/ip_local_port_range)
+
+   •   SOCKET: es el "extremo" de una comunicacion. Se forma con:
+               IP + PUERTO + PROTOCOLO        ej.  192.168.1.11:4444/tcp
+
+       Una CONEXION TCP queda identificada por 4 datos (la "4-tupla"):
+               IP origen : puerto origen  ↔  IP destino : puerto destino
+               192.168.1.11:51234         ↔  142.250.1.1:443
+
+       Por eso un servidor web puede atender miles de clientes en el MISMO puerto 443:
+       cada cliente trae un par (IP, puerto origen) distinto → socket distinto.
+
+       Analogia: la IP es el edificio, el puerto es el numero de apartamento, y el socket
+       es la llamada concreta entre un apartamento y otro.
+
+   •   Estados de un socket (los que veras con ss):
+           LISTEN        un programa esta esperando conexiones en ese puerto (servidor)
+           ESTAB         conexion establecida (handshake completado)
+           TIME-WAIT     conexion cerrada, el sistema espera un poco antes de liberarla
+           UNCONN        socket UDP (UDP no tiene "conexion", solo esta abierto)
+
+   •   Por que importa para Nmap: un puerto "open" en Nmap = hay un socket en LISTEN en el
+       objetivo. "closed" = el equipo responde pero nadie escucha ahi (RST). "filtered" =
+       un firewall no deja saber.
+
+   --------------------------------------------------------------------------------------------------
+   Comandos de la practica: que hace cada uno
+   --------------------------------------------------------------------------------------------------
+
+   ss -tulnp
+       ss = "socket statistics": lista los sockets del sistema (reemplazo moderno de netstat).
+           -t  sockets TCP
+           -u  sockets UDP
+           -l  solo los que estan en LISTEN (esperando conexiones = servicios/servidores)
+           -n  numerico: muestra 22 en vez de "ssh" y la IP en vez del nombre (mas rapido)
+           -p  muestra el proceso (programa + PID) dueño del socket; sin sudo solo ves los tuyos
+       Columnas: Local Address:Port = donde escucha. 0.0.0.0 = en todas las interfaces;
+       127.0.0.1 = solo accesible desde el propio equipo.
+
+   nc -lvnp 4444
+       nc (netcat) = "navaja suiza" de red: abre conexiones TCP/UDP a mano.
+           -l  modo escucha (actua como SERVIDOR)
+           -v  verbose: avisa cuando alguien se conecta
+           -n  no resolver nombres DNS
+           -p 4444  puerto donde escuchar
+       Resultado: crea un socket en LISTEN en 0.0.0.0:4444.
+
+   ss -tlnp | grep 4444
+       Lista solo sockets TCP en LISTEN y el | grep 4444 filtra la linea del puerto 4444.
+       Sirve para COMPROBAR que el nc de arriba realmente esta escuchando.
+
+   nc 127.0.0.1 4444
+       nc sin -l actua como CLIENTE: se conecta a 127.0.0.1 (loopback = tu propio equipo)
+       en el puerto 4444. Hace el three-way handshake. Lo que escribas aparece en la otra
+       terminal (y al reves): es un chat por un socket TCP.
+
+   ss -tnp | grep 4444
+       Sin -l: muestra conexiones ACTIVAS (ESTAB), no las que escuchan. Aparecen 2 lineas,
+       una por cada extremo:
+           127.0.0.1:4444  ↔ 127.0.0.1:5XXXX   (lado servidor)
+           127.0.0.1:5XXXX ↔ 127.0.0.1:4444    (lado cliente)
+       El 5XXXX es el puerto EFIMERO que el sistema asigno al cliente → la 4-tupla.
+
+   nmap -p 4444 127.0.0.1
+       Escanea solo el puerto 4444 de tu propia maquina.
+           Con nc escuchando  → 4444/tcp open   (hay socket LISTEN, responde SYN-ACK)
+           Sin nc (Ctrl+C)    → 4444/tcp closed (el kernel responde RST, nadie escucha)
+       Demuestra en vivo la relacion socket LISTEN ↔ puerto open.
+
+   cat /proc/sys/net/ipv4/ip_local_port_range
+       /proc es un sistema de archivos virtual donde el kernel expone su configuracion.
+       Este archivo contiene 2 numeros: el primer y ultimo puerto que Linux usa como
+       puertos efimeros (de origen) para conexiones salientes. En Linux suele ser
+       32768 60999 (distinto al rango "oficial" 49152-65535).
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+   1) ss -tulnp
+       Netid  State  Recv-Q  Send-Q  Local Address:Port  Peer Address:Port  Process
+       (sin ninguna fila)
+
+       - Resultado: mi equipo (BlackArch) NO tiene ningun socket TCP ni UDP en LISTEN → no
+         expone ningun servicio. Arch/BlackArch no activa servicios (sshd, etc.) por defecto:
+         hay que habilitarlos a mano con systemctl.
+       - Consecuencia: si alguien le hace nmap a 192.168.1.11 veria todos los puertos
+         closed (o filtered si hubiera firewall). Superficie de ataque minima.
+       - Columnas: Recv-Q/Send-Q = datos en cola de recepcion/envio; Peer Address = el
+         otro extremo (en LISTEN sale *:* porque aun no hay nadie conectado).
+
+   2) nc -lvnp 4444   +   ss -tlnp | grep 4444
+       LISTEN 0      1            0.0.0.0:4444      0.0.0.0:*    users:(("nc",pid=20355,fd=3))
+
+       - LISTEN          el socket esta esperando conexiones.
+       - Recv-Q = 0      en un socket LISTEN: conexiones que ya completaron el handshake y
+                         esperan a que el programa las acepte (ninguna todavia).
+       - Send-Q = 1      en un socket LISTEN: es el BACKLOG, el maximo de conexiones en cola.
+                         nc lo pone en 1 porque solo atiende a un cliente.
+       - 0.0.0.0:4444    escucha en TODAS las interfaces (lo, wlan0...) → accesible desde la
+                         LAN, no solo desde el propio equipo.
+       - 0.0.0.0:*       Peer vacio: aun no hay nadie conectado.
+       - nc pid=20355    el proceso dueño del socket (se podria matar con kill 20355).
+       - fd=3            file descriptor: en Linux "todo es un archivo"; 0,1,2 son stdin,
+                         stdout y stderr, asi que el socket recibe el siguiente libre: el 3.
+
+   (pendiente: pasos 3-7)
+
+==================================================================================================
+TEMA 5: ICMP (REPASO APLICADO A NMAP)
+==================================================================================================
+   (pendiente)
+
+==================================================================================================
+TEMA 6: DNS, DHCP, GATEWAY Y NAT
+==================================================================================================
+   (pendiente)
