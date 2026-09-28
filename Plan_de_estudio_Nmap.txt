@@ -39,12 +39,14 @@ Temas:
     e identificación de MACs aleatorias/privadas vía el bit
     locally-administered)
 
--   [ ] TCP vs UDP — 👉 EN CURSO (tema actual)
+-   [x] TCP vs UDP — visto en Segunda Clase con práctica (tcpdump, nc)
 
--   [~] Puertos y sockets — visto parcialmente en Primera Clase (puertos
-    sí, sockets aún no)
+-   [x] Puertos y sockets — completado en Tercera Clase (ss -tulnp,
+    nc como servidor/cliente, 4-tupla, puertos efimeros, open/closed en
+    Nmap) → TEMA_4_Puertos_y_Sockets.txt
 
--   [x] ICMP — visto en Primera Clase (ping)
+-   [x] ICMP — visto en Primera Clase (ping) · 👉 repaso aplicado a Nmap
+    EN CURSO (Tercera Clase, Tema 5)
 
 -   [~] DNS, DHCP, gateway y NAT — visto parcialmente en Primera Clase
     (gateway y mención breve de DNS; falta DHCP y NAT)

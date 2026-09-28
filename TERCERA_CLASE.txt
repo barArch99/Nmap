@@ -2,7 +2,9 @@
        Temas: Puertos y Sockets, ICMP (repaso aplicado a Nmap), DNS / DHCP / Gateway / NAT
        (Practica en BlackArch - host 'blackarch', usuario ecorp - fecha: 2026-09-28)
 
-       Pendientes que cierra esta clase (segun Plan_de_estudio_Nmap.txt):
+       Estado:  TEMA 4 [x] terminado · TEMA 5 [ ] en curso · TEMA 6 [ ] pendiente
+
+   Pendientes que cierra esta clase (segun Plan_de_estudio_Nmap.txt):
            [~] Puertos y sockets     → faltaba: sockets
            [x] ICMP                  → repaso enfocado a como lo usa Nmap
            [~] DNS, DHCP, gateway, NAT → faltaba: DHCP y NAT (y DNS a fondo)
@@ -125,7 +127,47 @@ TEMA 4: PUERTOS Y SOCKETS
        - fd=3            file descriptor: en Linux "todo es un archivo"; 0,1,2 son stdin,
                          stdout y stderr, asi que el socket recibe el siguiente libre: el 3.
 
-   (pendiente: pasos 3-7)
+   3) nc 127.0.0.1 4444   +   ss -tnp | grep 4444      (conexion establecida)
+       ESTAB  0  0  127.0.0.1:4444   127.0.0.1:37408  users:(("nc",pid=27366,fd=4))  ← servidor
+       ESTAB  0  0  127.0.0.1:37408  127.0.0.1:4444   users:(("nc",pid=27370,fd=3))  ← cliente
+
+       - 2 lineas = los 2 extremos de UNA conexion (cada uno es un socket).
+       - La 4-tupla: 127.0.0.1:37408 ↔ 127.0.0.1:4444
+       - 37408 = puerto EFIMERO que Linux eligio para el cliente (esta dentro del rango
+         32768-60999 del paso 7).
+       - El servidor ahora usa fd=4: el fd=3 sigue siendo el socket LISTEN, y al aceptar la
+         conexion el kernel crea un socket NUEVO (fd=4) solo para ese cliente. Asi un
+         servidor atiende a varios clientes: 1 socket LISTEN + 1 socket por conexion.
+
+   4) nmap -p 4444 127.0.0.1
+       Con nc escuchando:   4444/tcp open    krb524
+       Sin nc (cerrado):    4444/tcp closed  krb524
+
+       - open = hay socket LISTEN (responde SYN-ACK); closed = nadie escucha (RST).
+       - OJO: "krb524" NO es lo que corre ahi (era nc). Nmap solo pone el nombre que tiene
+         ese numero en su tabla /usr/share/nmap/nmap-services. Para saber el servicio REAL
+         hace falta -sV (deteccion de versiones, Semana 3 del plan).
+
+   5) ss -tan | grep 4444   (justo despues de cerrar)
+       TIME-WAIT  0  0  127.0.0.1:4444  127.0.0.1:37408
+
+       - La conexion ya termino pero el sistema la retiene unos segundos (~60 s en Linux)
+         por si llegan paquetes rezagados. Luego desaparece sola.
+
+   6) cat /proc/sys/net/ipv4/ip_local_port_range
+       32768   60999
+       - Rango de puertos efimeros de Linux (distinto al oficial IANA 49152-65535).
+         El 37408 del paso 3 cae dentro de este rango.
+
+   --------------------------------------------------------------------------------------------------
+   Conclusiones del Tema 4
+   --------------------------------------------------------------------------------------------------
+       - Puerto = numero (0-65535) por protocolo; socket = IP + puerto + protocolo.
+       - Una conexion TCP = 4-tupla; el cliente usa un puerto efimero aleatorio.
+       - Servidor: 1 socket LISTEN + 1 socket nuevo por cada cliente aceptado.
+       - Nmap "open" = socket LISTEN en el objetivo; "closed" = RST.
+       - El nombre del servicio que muestra Nmap sin -sV es solo una suposicion por numero.
+       - ss es la herramienta para ver sockets propios: -tulnp (servicios), -tnp (conexiones).
 
 ==================================================================================================
 TEMA 5: ICMP (REPASO APLICADO A NMAP)
