@@ -1,0 +1,313 @@
+                                         TERCERA CLASE
+       TEMA 5: ICMP (APLICADO A NMAP) + CAPTURA DE TRAFICO CON TCPDUMP
+       (Practica en BlackArch - host 'blackarch' - fecha: 2026-09-28)
+
+==================================================================================================
+
+   •   ICMP (Internet Control Message Protocol): protocolo de MENSAJES DE CONTROL y ERROR de
+       la capa de red (va dentro de IP, igual que TCP y UDP, pero NO usa puertos).
+       No transporta datos de aplicaciones: sirve para que los equipos se avisen cosas como
+       "estoy vivo", "no llego a ese destino", "ese puerto esta cerrado", "el paquete murio".
+
+   •   Cada mensaje tiene TIPO y CODIGO. Los importantes:
+
+           Tipo  Nombre                      Para que se usa
+           ----  --------------------------  ----------------------------------------------
+            8    Echo Request                ping (pregunta "¿estas vivo?")
+            0    Echo Reply                  respuesta al ping
+            3    Destination Unreachable     no se pudo entregar. Codigos clave:
+                   code 1  Host unreachable       el host no existe / no responde en la LAN
+                   code 3  PORT unreachable       puerto UDP CERRADO
+                   code 13 Admin prohibited       un FIREWALL lo bloqueo
+           11    Time Exceeded               el TTL llego a 0 (lo usa traceroute/tracepath)
+           13/14 Timestamp Request/Reply     otra forma de preguntar "¿estas vivo?"
+
+   •   Recordatorio TTL (Segunda Clase): cada router resta 1. Cuando llega a 0 el router
+       descarta el paquete y devuelve ICMP tipo 11. tracepath/traceroute aprovechan esto:
+       mandan paquetes con TTL=1, 2, 3... y cada router que responde revela un salto.
+
+   •   COMO LO USA NMAP (lo importante de este tema):
+
+       1) Descubrimiento de hosts (-sn):
+            - En la LAN y como root → usa ARP (Segunda Clase), no ICMP.
+            - Fuera de la LAN y como root, por defecto manda 4 sondas:
+                  ICMP echo (tipo 8) + TCP SYN al 443 + TCP ACK al 80 + ICMP timestamp (13)
+              Si CUALQUIERA responde → host "up".
+            - Opciones para elegir la sonda ICMP:
+                  -PE  echo request      -PP  timestamp      -PM  address mask
+            - Si un firewall bloquea el ping, Nmap puede creer que el host esta caido →
+              -Pn = "no hagas descubrimiento, asume que esta vivo y escanea igual".
+
+       2) Escaneo UDP (-sU): explica el problema visto en la Segunda Clase:
+            - Puerto UDP cerrado → el objetivo responde ICMP tipo 3 code 3 → "closed"
+            - Respuesta ICMP tipo 3 con otro codigo (ej. 13) → "filtered" (firewall)
+            - Sin respuesta → "open|filtered" (no se puede distinguir)
+            - Linux limita cuantos ICMP de error envia por segundo → por eso -sU es LENTO.
+
+       3) Estado "filtered" en TCP: si en vez de SYN-ACK o RST llega un ICMP
+          "unreachable" (tipo 3), Nmap marca el puerto como filtered.
+
+   --------------------------------------------------------------------------------------------------
+   Subtema: ¿Que es y para que sirve tcpdump?
+   --------------------------------------------------------------------------------------------------
+   •   tcpdump es un CAPTURADOR DE PAQUETES (sniffer) de terminal. Pone la tarjeta a "escuchar"
+       y muestra cada paquete que entra o sale: origen, destino, protocolo, flags, tamaño.
+       Es como la version de terminal de Wireshark (ambos usan la libreria libpcap).
+       Ya se uso en la Segunda Clase (Kali) para ver el handshake TCP y un datagrama UDP.
+
+   •   Para que sirve:
+       - VER lo que realmente pasa por la red en vez de suponerlo (ej. que manda Nmap y que
+         le responde el objetivo).
+       - Diagnosticar problemas (¿sale el paquete? ¿llega respuesta? ¿quien no contesta?).
+       - Aprender protocolos (ARP, ICMP, TCP, UDP, DNS, DHCP) viendolos en vivo.
+       - Guardar capturas en .pcap para analizarlas despues en Wireshark.
+
+   •   Necesita sudo: capturar exige poner la interfaz en modo promiscuo/acceso crudo.
+
+   •   Opciones basicas:
+           -i enp8s0     interfaz a escuchar (-i any = todas, -i lo = loopback)
+           -n            no traducir IPs a nombres (mas rapido y sin generar trafico DNS)
+           -c 10         capturar 10 paquetes y parar (si no, Ctrl+C)
+           -v / -vv      mas detalle (TTL, longitud, flags IP...)
+           -e            mostrar tambien las MAC (capa 2)
+           -w cap.pcap   guardar en archivo      -r cap.pcap   leer un archivo guardado
+           -A / -X       mostrar el contenido del paquete (ASCII / hex+ASCII)
+
+   •   Filtros (se escriben al final, sintaxis BPF):
+           icmp                     solo ICMP
+           arp                      solo ARP
+           tcp / udp                por protocolo
+           port 53                  un puerto (origen o destino)
+           host 192.168.1.1         trafico desde/hacia esa IP
+           net 192.168.1.0/24       toda una red
+           combinables: and, or, not →  host 192.168.1.1 and icmp
+
+   •   Ejemplos:
+           sudo tcpdump -i enp8s0 -n icmp                 pings entrando y saliendo
+           sudo tcpdump -i enp8s0 -n port 53              consultas DNS
+           sudo tcpdump -i enp8s0 -n host 192.168.1.1 -c 20
+           sudo tcpdump -i enp8s0 -w captura.pcap         guardar para Wireshark
+
+   •   Como leer una linea:
+           12:00:01.123 IP 192.168.1.20 > 192.168.1.1: ICMP echo request, id 5, seq 1, length 64
+           hora         IP origen      > IP destino : protocolo y detalle
+
+   •   Etica: solo capturar en tus equipos/redes o con autorizacion; en una red ajena
+       puede verse trafico de otras personas.
+
+   --------------------------------------------------------------------------------------------------
+   Practica y resultados propios
+   --------------------------------------------------------------------------------------------------
+   Equipo hoy: BlackArch por CABLE (enp8s0), IP 192.168.1.20/24, gateway 192.168.1.1
+
+   Idea base: "capturar trafico" = ver cada paquete (sobre con origen, destino, tipo y
+   contenido) que entra/sale de la tarjeta. Dos formas:
+       nmap --packet-trace  → solo los paquetes de Nmap
+       tcpdump              → todo lo que pasa por la interfaz
+   En --packet-trace:  SENT = paquete ENVIADO (yo → objetivo)
+                       RCVD = paquete RECIBIDO (objetivo → yo)
+       SENT sin RCVD = nadie contesto (apagado, no existe o firewall).
+
+   1) nmap -sn --packet-trace 192.168.1.1   (como root)
+       SENT (0.0092s) ARP who-has 192.168.1.1 tell 192.168.1.20
+       RCVD (0.0136s) ARP reply 192.168.1.1 is-at 44:48:B9:A4:22:10
+       NSOCK INFO ... UDP connection requested to 200.21.200.80:53
+       NSOCK INFO ... UDP connection requested to 200.21.200.10:53
+       NSOCK INFO ... Write request for 42 bytes ... [200.21.200.80:53]
+       NSOCK INFO ... READ SUCCESS ... [200.21.200.80:53] (119 bytes)
+       Host is up (0.0044s latency).
+       MAC Address: 44:48:B9:A4:22:10 (MitraStar Technology)
+
+       - Descubrimiento: 1 SENT (ARP who-has) + 1 RCVD (ARP reply) → host up.
+         Como el router esta en la LAN, Nmap uso ARP y NO ICMP.
+         0.0136 - 0.0092 = 0.0044 s → la "latency" de 4.4 ms que reporta.
+       - MitraStar Technology = fabricante del router (sacado del OUI de la MAC 44:48:B9).
+       - Lineas NSOCK = DNS INVERSO: Nmap pregunta por UDP puerto 53 a los servidores DNS
+         configurados (200.21.200.80 y 200.21.200.10, IPs publicas → DNS del proveedor de
+         internet) "¿que nombre tiene 192.168.1.1?". Mando 42 bytes, recibio 119 de respuesta.
+         No es parte del descubrimiento; es solo para poner nombre al host.
+         Con -n se desactiva (mas rapido y no genera trafico DNS). → Se vera en Tema 6.
+       - Escaneo previo de toda la red (nmap -sn 192.168.1.0/24): aparecio otra MAC
+         aleatoria (3A:62:... → segundo digito A) y otro equipo MitraStar en 192.168.1.48.
+
+   2) nmap -sn -PE --disable-arp-ping -n --packet-trace 192.168.1.1   (forzar ICMP)
+       SENT (0.0079s) ICMP [192.168.1.20 > 192.168.1.1 Echo request (type=8/code=0) id=21728 seq=0]
+                      IP [ttl=42 id=39751 iplen=28 ]
+       RCVD (0.0127s) ICMP [192.168.1.1 > 192.168.1.20 Echo reply (type=0/code=0) id=21728 seq=0]
+                      IP [ttl=64 id=20042 iplen=28 ]
+       Host is up (0.0049s latency).
+
+       Opciones: -PE = descubrir con ICMP echo · --disable-arp-ping = no usar ARP ·
+                 -n = sin DNS inverso (desaparecen las lineas NSOCK).
+
+       Parte ICMP:
+       - type=8/code=0 → Echo Request (pregunta).  type=0/code=0 → Echo Reply (respuesta).
+       - id=21728 y seq=0 son IGUALES en ambos: asi Nmap sabe que esa respuesta corresponde
+         a SU pregunta (si mandara varios, seq iria 0, 1, 2...).
+       Parte IP:
+       - ttl=42 (enviado): NO es el 64 normal de Linux. Nmap construye el paquete a mano y
+         elige un TTL aleatorio → un IDS atento puede notar que "no es un ping normal".
+       - ttl=64 (recibido): el router responde con 64 intacto → esta a 0 saltos (misma LAN)
+         y su sistema probablemente es Linux/embebido (64 inicial).
+       - iplen=28 = 20 bytes cabecera IP + 8 bytes cabecera ICMP, SIN datos.
+         (El comando ping normal manda 84: 20 + 8 + 56 de relleno.)
+       - id (IP) = numero de identificacion del paquete, distinto en cada lado.
+       - 0.0127 - 0.0079 ≈ 4.9 ms = latency. Aun asi muestra la MAC porque el router
+         esta en la LAN (el kernel la conoce por su cache ARP).
+
+       Comparacion ARP vs ICMP contra el mismo router: ambos dan "up" con ~4-5 ms.
+       En la LAN Nmap prefiere ARP porque un firewall puede bloquear ICMP, pero ningun
+       equipo puede ignorar ARP si quiere comunicarse en la red.
+
+   3) nmap -sn -PE --disable-arp-ping -n --packet-trace 192.168.1.250   (IP sin equipo)
+       SENT (0.0142s) ICMP [192.168.1.20 > 192.168.1.250 Echo request (type=8/code=0) id=10105 seq=0] IP [ttl=43 ...]
+       SENT (1.0144s) ICMP [192.168.1.20 > 192.168.1.250 Echo request (type=8/code=0) id=3969 seq=0]  IP [ttl=50 ...]
+       Note: Host seems down. If it is really up, but blocking our ping probes, try -Pn
+       Nmap done: 1 IP address (0 hosts up) scanned in 2.03 seconds
+
+       - 2 SENT y 0 RCVD → nadie contesto → "Host seems down".
+       - Nmap no se rinde al primer intento: espera ~1 s y REINTENTA (1.0144 - 0.0142 ≈ 1 s).
+         Tras el 2º intento espera otro ~1 s → total 2.03 s (vs 0.06 s cuando si contesta).
+         Por eso escanear rangos con muchas IPs vacias es lento.
+       - Cada intento usa id y ttl distintos (43, 50): Nmap los aleatoriza en cada paquete.
+       - Sin respuesta tampoco hay MAC ni fabricante.
+       - "seems down" = PARECE caido. Nmap no puede distinguir entre:
+             a) no hay ningun equipo en esa IP
+             b) hay un equipo, pero un firewall descarta los ping (ICMP)
+         Por eso sugiere -Pn: saltarse el descubrimiento y escanear puertos igualmente.
+
+   Resumen descubrimiento con ICMP:
+       SENT + RCVD Echo reply     → up
+       SENT + SENT (sin RCVD)     → seems down (apagado, inexistente o ICMP bloqueado)
+       Duda por firewall          → -Pn
+
+   --------------------------------------------------------------------------------------------------
+   tcpdump paso a paso (practica)
+   --------------------------------------------------------------------------------------------------
+   Paso 1) pacman -S tcpdump  +  tcpdump --version   → instalado OK
+
+   Paso 2) tcpdump -D   (lista de interfaces donde se puede capturar)
+       1.enp8s0 [Up, Running, Connected]          ← cable: por aqui va mi trafico ahora
+       2.any (captures on all interfaces)         ← todas a la vez
+       3.lo [Up, Running, Loopback]               ← trafico del equipo consigo mismo (127.0.0.1)
+       4.wlp9s0 [Up, Wireless, Not associated]    ← Wi-Fi encendido pero sin red
+       5.bluetooth0 / 6.bluetooth-monitor         ← Bluetooth
+       7.nflog / 8.nfqueue                        ← interfaces del firewall del kernel (netfilter)
+       9.dbus-system / 10.dbus-session            ← mensajes internos entre programas (no es red)
+       - "Connected" solo en enp8s0 → es la interfaz a usar con -i enp8s0.
+
+   Paso 3) tcpdump -i enp8s0 -n -c 5   (primera captura, sin filtro)
+       listening on enp8s0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+       15:30:16.714705 IP 192.168.1.20.39054 > 160.79.104.10.443: Flags [.], ack 546180975, win 88, options [nop,nop,TS ...], length 0
+       15:30:16.722905 IP 160.79.104.10.443 > 192.168.1.20.39054: Flags [.], ack 1, win 18, ..., length 0
+       15:30:16.966701 IP 192.168.1.20.33718 > 34.149.66.165.443: Flags [.], ack 1759363791, win 77, ..., length 0
+       15:30:17.046446 IP 34.149.66.165.443 > 192.168.1.20.33718: Flags [.], ack 1, win 823, ..., length 0
+       15:30:17.739641 IP 192.168.1.20.39054 > 160.79.104.10.443: Flags [.], ack 1, win 88, ..., length 0
+       5 packets captured / 6 packets received by filter / 0 packets dropped by kernel
+
+       Cabecera:
+       - verbose output suppressed → hay mas detalle disponible con -v / -vv
+       - link-type EN10MB (Ethernet) → captura tramas Ethernet (el cable)
+       - snapshot length 262144 → guarda hasta 256 KB de cada paquete (o sea, completo)
+
+       Como leer una linea (campo por campo):
+           15:30:16.714705            hora exacta (hasta microsegundos)
+           IP                         paquete IPv4
+           192.168.1.20.39054         IP ORIGEN . PUERTO origen (el ultimo numero es el puerto)
+           >                          direccion
+           160.79.104.10.443          IP DESTINO . PUERTO destino (443 = HTTPS)
+           Flags [.]                  flags TCP: [.] = solo ACK
+           ack 546180975 / ack 1      numero de confirmacion (el 1 es relativo, como en la 2ª clase)
+           win 88                     ventana: cuanto espacio de recepcion le queda al que envia
+           options [nop,nop,TS ...]   opciones TCP (TS = marcas de tiempo)
+           length 0                   0 bytes de DATOS → paquete de control, sin contenido
+
+       Que estaba pasando:
+       - 2 conexiones HTTPS (443) ya ESTABLECIDAS, abiertas desde antes (no se ve handshake).
+       - Mi equipo usa puertos EFIMEROS (39054, 33718) → soy el cliente (Tema 4).
+       - Todo es [.] + length 0 → ACKs / keep-alive: "sigo aqui" para mantener la conexion
+         viva sin enviar datos.
+       - Ida y vuelta: 192.168.1.20 → servidor y servidor → 192.168.1.20.
+       - El contenido va cifrado (HTTPS/TLS): tcpdump ve IPs, puertos y flags, NO lo que
+         se dice dentro.
+       - Pie: 5 captured (los pedidos con -c 5), 6 received by filter (llego 1 mas mientras
+         se detenia), 0 dropped (no se perdio ninguno).
+
+   Paso 4) ss -tnp | grep 160.79.104.10   (¿que programa es dueño de esa conexion?)
+       ESTAB 0 0  192.168.1.20:39054  160.79.104.10:443  users:(("claude",pid=18757,fd=12))
+       ESTAB 0 0  192.168.1.20:43748  160.79.104.10:443  users:(("claude",pid=18757,fd=16))
+
+       - El puerto 39054 es EXACTAMENTE el que aparecio en la captura de tcpdump → misma
+         conexion. El dueño es el proceso "claude" (Claude Code, pid 18757) hablando con
+         los servidores de Anthropic por HTTPS.
+       - Un mismo programa tiene 2 conexiones (2 sockets, fd 12 y fd 16) al mismo servidor,
+         cada una con su propio puerto efimero (39054 y 43748).
+       - Metodo aprendido:  tcpdump → QUE IPs/puertos hablan
+                            ss -tnp → QUE PROGRAMA tiene ese socket
+         (util para detectar conexiones sospechosas en tu equipo).
+
+   Paso 5) Filtro:  Terminal 1: tcpdump -i enp8s0 -n icmp   ·   Terminal 2: ping -c 2 192.168.1.1
+       16:04:48.372019 IP 192.168.1.20 > 192.168.1.1: ICMP echo request, id 54810, seq 1, length 64
+       16:04:48.381898 IP 192.168.1.1 > 192.168.1.20: ICMP echo reply, id 54810, seq 1, length 64
+       16:04:49.373224 IP 192.168.1.20 > 192.168.1.1: ICMP echo request, id 54810, seq 2, length 64
+       16:04:49.377687 IP 192.168.1.1 > 192.168.1.20: ICMP echo reply, id 54810, seq 2, length 64
+
+       - El filtro "icmp" funciono: no aparece NADA de HTTPS (las conexiones de claude
+         siguen activas, pero tcpdump las descarta).
+       - Sin tcpdump esperando no se ve nada: se queda "listening" hasta que haya trafico
+         que cumpla el filtro; sin -c se detiene con Ctrl+C.
+       - IPs SIN puerto (192.168.1.20 > 192.168.1.1): ICMP no usa puertos.
+       - Pareja request/reply con el mismo seq → cada pregunta tiene su respuesta.
+       - id 54810 igual en todo el ping (identifica ESTE comando ping); seq sube 1, 2.
+         (ping empieza en seq 1; Nmap empezo en seq 0.)
+       - Separacion de 1 s entre request (48.37 → 49.37): ping manda uno por segundo.
+       - Tiempo de respuesta: 48.381898 - 48.372019 ≈ 9.9 ms ; 49.377687 - 49.373224 ≈ 4.5 ms
+       - length 64 = 8 cabecera ICMP + 56 datos de relleno (con IP: 84 bytes).
+         Nmap mando iplen=28 (sin datos) → un ping de Nmap y uno normal SE DISTINGUEN.
+
+   Paso 6) Puerto UDP cerrado = ICMP port unreachable
+       Terminal 1: sudo tcpdump -i lo -n icmp      Terminal 2: sudo nmap -sU -p 9999 127.0.0.1
+
+       Terminal 2:  9999/udp closed distinct      (latency 0.000051s)
+       Terminal 1:  16:10:16.490045 IP 127.0.0.1 > 127.0.0.1: ICMP 127.0.0.1 udp port 9999 unreachable, length 36
+
+       - 1er intento no salio nada en tcpdump: hay que arrancar tcpdump ANTES del escaneo y
+         en la interfaz correcta (lo, porque el trafico a 127.0.0.1 nunca sale por el cable).
+       - Esta es la PRUEBA de por que Nmap dice "closed" en UDP: el sistema respondio
+         ICMP tipo 3 code 3 (Destination/Port Unreachable) = "nadie escucha en ese puerto".
+       - Origen y destino 127.0.0.1: el kernel se responde a si mismo (loopback).
+       - length 36 = 8 cabecera ICMP + 20 cabecera IP original + 8 cabecera UDP original.
+         El ICMP de error COPIA el inicio del paquete que fallo → asi Nmap sabe a cual de
+         sus sondas corresponde (puerto 9999).
+       - "distinct" = nombre del 9999 en la tabla de Nmap, no el servicio real.
+       - Sin este ICMP (firewall que lo descarta) el resultado seria "open|filtered".
+
+   Paso 7) Pregunta + respuesta juntas (filtro combinado con "or")
+       Terminal 1: sudo tcpdump -i lo -n 'icmp or udp port 9999'
+       Terminal 2: sudo nmap -sU -p 9999 127.0.0.1
+
+       16:11:52.053925 IP 127.0.0.1.46868 > 127.0.0.1.9999: UDP, length 0
+       16:11:52.053947 IP 127.0.0.1 > 127.0.0.1: ICMP 127.0.0.1 udp port 9999 unreachable, length 36
+
+       - Linea 1 = la SONDA de Nmap: UDP desde el puerto 46868 (origen) al 9999 (destino).
+         length 0 → datagrama VACIO. Para puertos que no conoce Nmap manda UDP sin datos;
+         para puertos conocidos (53 DNS, 123 NTP...) manda una consulta real de ese
+         protocolo para provocar respuesta.
+       - Linea 2 = la RESPUESTA del kernel: ICMP port unreachable → "closed".
+       - 053947 - 053925 = 22 microsegundos (todo dentro del mismo equipo).
+       - Filtros: 'icmp or udp port 9999' → "o uno o el otro". Comillas para que bash no
+         interprete el filtro. Tambien existen "and" y "not".
+       - Error comun visto: tcpdump -i snp8s0 (typo) → la interfaz no existe.
+
+   --------------------------------------------------------------------------------------------------
+   Conclusiones del Tema 5
+   --------------------------------------------------------------------------------------------------
+       - ICMP = mensajes de control/error dentro de IP, sin puertos. Tipo + codigo.
+       - Nmap -sn: en LAN usa ARP; con -PE usa ICMP echo (8 → 0). Sin respuesta tras 2
+         intentos → "seems down" (no distingue apagado de firewall → -Pn).
+       - --packet-trace muestra lo que Nmap envia (SENT) y recibe (RCVD).
+       - El ping de Nmap es distinto a un ping normal (sin datos, TTL aleatorio, seq 0).
+       - UDP cerrado = ICMP tipo 3 code 3 (port unreachable); sin respuesta = open|filtered.
+       - tcpdump: -D (interfaces), -i (interfaz), -n (sin DNS), -c (cantidad), filtros
+         (icmp, udp port N, host IP, or/and/not). Arrancarlo ANTES del trafico.
+       - tcpdump dice QUE hablan (IP/puerto); ss -tnp dice QUE PROGRAMA.
