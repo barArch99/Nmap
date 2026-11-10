@@ -10,3 +10,4 @@
 - [TERCERA_CLASE.txt](<TERCERA_CLASE.txt>)
 - [TEMA_4_Puertos_y_Sockets.txt](<TEMA_4_Puertos_y_Sockets.txt>)
 - [TEMA_5_ICMP_y_tcpdump.txt](<TEMA_5_ICMP_y_tcpdump.txt>)
+- [TEMA_6_DNS_DHCP_Gateway_NAT.txt](<TEMA_6_DNS_DHCP_Gateway_NAT.txt>)

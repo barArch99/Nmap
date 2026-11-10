@@ -50,8 +50,9 @@ Temas:
     unreachable) + captura de trafico con tcpdump →
     TEMA_5_ICMP_y_tcpdump.txt
 
--   [~] DNS, DHCP, gateway y NAT — visto parcialmente en Primera Clase
-    (gateway y mención breve de DNS; falta DHCP y NAT)
+-   [x] DNS, DHCP, gateway y NAT — completado en Tercera Clase (dig A/PTR,
+    resolv.conf, lease DHCP, NAT con IP publica) →
+    TEMA_6_DNS_DHCP_Gateway_NAT.txt
 
 Comandos/práctica:
 
